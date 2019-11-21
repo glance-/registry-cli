@@ -768,6 +768,30 @@ def get_ordered_tags(registry, image_name, tags_list, order_by_date=False):
     return sorted(tags_list, key=natural_keys)
 
 
+def get_size_from_layer(layer):
+    if 'size' in layer:
+        return layer['size']
+    else:
+        return layer['blobSum']
+
+def sum_layers_in_tag(registry, image_name, tag):
+    return sum(map(get_size_from_layer,
+        registry.list_tag_layers(image_name, tag)))
+
+def get_image_tag_count_and_size(registry, image_name):
+    tags_list = registry.list_tags(image_name)
+    size = 0
+
+    #import multiprocessing
+    #import math
+    #sub_pool = multiprocessing.Pool(processes=math.ceil(len(tags_list)/8))
+    #size = sum(sub_pool.starmap(sum_layers_in_tag, [(registry, image_name, tag) for tag in tags_list]))
+    from itertools import starmap
+    size = sum(starmap(sum_layers_in_tag, [(registry, image_name, tag) for tag in tags_list]))
+
+    return {'image_name': image_name, 'tags_list': tags_list, 'size': size}
+
+
 def main_loop(args):
     global DEBUG
 
@@ -823,6 +847,16 @@ def main_loop(args):
         image_list = registry.list_images()
         if args.images_like:
             image_list = keep_images_like(image_list, args.images_like)
+
+    #XXX
+    import multiprocessing
+    pool = multiprocessing.Pool(processes=int(len(image_list)/20))
+    for res in pool.starmap(get_image_tag_count_and_size, [(registry,
+        image_name) for image_name in image_list], chunksize=10):
+        #res['size'] = sum(pool.starmap(sum_layers_in_tag, [(registry, res['image_name'], tag) for tag in res['tags_list']], chunksize=10))
+        print("{0}\t{1}\t{2}".format(res['image_name'], len(res['tags_list']), res['size']/1024**2))
+
+    return
 
     # loop through registry's images
     # or through the ones given in command line
