@@ -16,7 +16,6 @@ import re
 import sys
 import os
 import argparse
-import www_authenticate
 from datetime import timedelta, datetime as dt
 from getpass import getpass
 from multiprocessing.pool import ThreadPool
@@ -86,6 +85,8 @@ class Requests:
             return (res, kwargs['headers']['Authorization'])
 
         if res.status_code == 401:
+            import www_authenticate
+
             if DEBUG: print("[debug][registry] Access denied. Refreshing token...")
             oauth = www_authenticate.parse(res.headers['Www-Authenticate'])
 
@@ -182,6 +183,8 @@ def get_auth_schemes(r,path):
     try_oauth = requests.head('{0}{1}'.format(r.hostname,path), verify=not r.no_validate_ssl)
 
     if 'Www-Authenticate' in try_oauth.headers:
+        import www_authenticate
+
         oauth = www_authenticate.parse(try_oauth.headers['Www-Authenticate'])
         if DEBUG:
             print('[debug][docker] Auth schemes found:{0}'.format([m for m in oauth]))
